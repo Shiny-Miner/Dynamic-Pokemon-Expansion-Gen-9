@@ -3,6 +3,7 @@ a.exe
 build/*
 extracted/*
 assembly/generated/*
+src/generated/*
 scripts/__pycache__
 *.sgm
 *.dmp

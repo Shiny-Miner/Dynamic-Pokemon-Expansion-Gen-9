@@ -1,17 +1,18 @@
 import os
 import sys
+import re
 from glob import glob
 
 # Data
 TM_HM_COUNT = 128
 TUTOR_COUNT = 152
-SPECIES_COUNT = 0x59F + 1
 
 TM_OUTPUT = "assembly/generated/tm_compatibility.s"
 TUTOR_OUTPUT = "assembly/generated/tutor_compatibility.s"
 TM_COMPATIBILITY = "src/tm_compatibility"
 TUTOR_COMPATIBILITY = "src/tutor_compatibility"
 SPECIES_DEFINES = "include/species.h"
+EVOLUTION_TABLE = "src/Evolution_Table.c"
 
 
 # Uses pre-made files corresponding to each TM to build species TM Data
@@ -25,7 +26,8 @@ def TutorDataBuilder():
 
 def DataBuilder(directory: str, numEntries: int, outputFile: str, dataType: str):
     fileList = [file for file in glob(directory + "**/*.txt", recursive=True)]
-    if os.path.isfile(outputFile) and max(list(map(os.path.getmtime, fileList))) < os.path.getmtime(outputFile):
+    dependencies = fileList + [SPECIES_DEFINES, EVOLUTION_TABLE, __file__]
+    if os.path.isfile(outputFile) and max(map(os.path.getmtime, dependencies)) < os.path.getmtime(outputFile):
         return
 
     print("Processing {} Data.".format(dataType))
@@ -69,6 +71,10 @@ def DataBuilder(directory: str, numEntries: int, outputFile: str, dataType: str)
                                 compatibilityTable[lineContents][tmId] = 1
                             except KeyError:
                                 print('Error with key: {} on line {} in: {}'.format(line.strip(), i + 1, filePath))
+
+    # New Mega forms share the compatibility of their untransformed species.
+    for mega, base in MegaBaseSpecies.items():
+        compatibilityTable[mega] = compatibilityTable[base][:]
 
     output.write(".thumb\n.align 2\n\n@THIS IS A GENERATED FILE! DO NOT MODIFY IT!\n\n"
                  ".global g{}Learnsets\ng{}Learnsets:\n".format(dataType, dataType))
@@ -155,6 +161,15 @@ def ChangeFileLine(filePath: str, lineToChange: int, replacement: str):
 
 SpeciesDict = DefinesDictMaker(SPECIES_DEFINES)
 ReverseSpeciesDict = ReverseDict(SpeciesDict)
+SPECIES_COUNT = max(SpeciesDict) + 1
+with open(EVOLUTION_TABLE) as evolutionFile:
+    MegaBaseSpecies = {
+        ReverseSpeciesDict[mega]: ReverseSpeciesDict[base]
+        for mega, base in re.findall(
+            r'\[(SPECIES_\w+)\]\s*=\s*\{\s*\{EVO_MEGA,\s*ITEM_NONE,\s*(SPECIES_\w+)',
+            evolutionFile.read())
+        if ReverseSpeciesDict[mega] > ReverseSpeciesDict['SPECIES_PECHARUNT']
+    }
 
 if __name__ == '__main__':
     TMDataBuilder()

@@ -6006,7 +6006,7 @@ const struct PokedexEntry gPokedexEntries[NATIONAL_DEX_COUNT] =
 	},
 	[NATIONAL_DEX_EMBOAR] =
 	{
-		.categoryName = {_M, 0xad, _SPACE, _F, _i, _r, _e, _SPACE, _P, _i, _g, _END},
+		.categoryName = {_M, _SPACE, _F, _i, _r, _e, _SPACE, _P, _i, _g, _END, _SPACE},
 		.height = 16,
 		.weight = 1500,
 		.description = DEX_ENTRY_EMBOAR,

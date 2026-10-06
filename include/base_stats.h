@@ -34,6 +34,16 @@ struct BaseStats
  /* 0x1A */	u8 hiddenAbility;		
 };
 
+// Kept separate so the vanilla 0x1C-byte BaseStats stride remains intact.
+struct SpeciesAbilities
+{
+    ability_t ability1;
+    ability_t ability2;
+    ability_t hiddenAbility;
+};
+
+extern const struct SpeciesAbilities gSpeciesAbilities[];
+
 enum
 {
     EGG_GROUP_NONE,

@@ -7,6 +7,7 @@ import itertools
 import hashlib
 import subprocess
 import sys
+import re
 from datetime import datetime
 from string import StringFileConverter
 from tm_tutor import TMDataBuilder, TutorDataBuilder
@@ -58,6 +59,152 @@ ASFLAGS = ['-mthumb', '-I', ASSEMBLY]
 LDFLAGS = ['BPRE.ld', '-T', 'linker.ld']
 CFLAGS = ['-mthumb', '-mno-thumb-interwork', '-mcpu=arm7tdmi', '-mtune=arm7tdmi',
           '-mno-long-calls', '-march=armv4t', '-Wall', '-Wextra', '-Os', '-fira-loop-pressure', '-fipa-pta']
+
+
+CANONICAL_U16_ABILITIES = {
+    'ABILITY_GORILLATACTICS',
+    'ABILITY_NEUTRALIZINGGAS',
+    'ABILITY_PASTELVEIL',
+    'ABILITY_HUNGERSWITCH',
+    'ABILITY_QUICKDRAW',
+    'ABILITY_UNSEENFIST',
+    'ABILITY_CURIOUSMEDICINE',
+    'ABILITY_TRANSISTOR',
+    'ABILITY_DRAGONSMAW',
+    'ABILITY_CHILLINGNEIGH',
+    'ABILITY_GRIMNEIGH',
+    'ABILITY_ASONEICERIDER',
+    'ABILITY_ASONESHADOWRIDER',
+    'ABILITY_LINGERINGAROMA',
+    'ABILITY_SEEDSOWER',
+    'ABILITY_THERMALEXCHANGE',
+    'ABILITY_ANGERSHELL',
+    'ABILITY_PURIFYINGSALT',
+    'ABILITY_WELLBAKEDBODY',
+    'ABILITY_WINDRIDER',
+    'ABILITY_GUARDDOG',
+    'ABILITY_ROCKYPAYLOAD',
+    'ABILITY_WINDPOWER',
+    'ABILITY_ZEROTOHERO',
+    'ABILITY_COMMANDER',
+    'ABILITY_ELECTROMORPHOSIS',
+    'ABILITY_PROTOSYNTHESIS',
+    'ABILITY_QUARKDRIVE',
+    'ABILITY_GOODASGOLD',
+    'ABILITY_VESSELOFRUIN',
+    'ABILITY_SWORDOFRUIN',
+    'ABILITY_TABLETSOFRUIN',
+    'ABILITY_BEADSOFRUIN',
+    'ABILITY_ORICHALCUMPULSE',
+    'ABILITY_HADRONENGINE',
+    'ABILITY_OPPORTUNIST',
+    'ABILITY_CUDCHEW',
+    'ABILITY_SHARPNESS',
+    'ABILITY_SUPREMEOVERLORD',
+    'ABILITY_COSTAR',
+    'ABILITY_TOXICDEBRIS',
+    'ABILITY_ARMORTAIL',
+    'ABILITY_EARTHEATER',
+    'ABILITY_MYCELIUMMIGHT',
+    'ABILITY_HOSPITALITY',
+    'ABILITY_MINDSEYE',
+    'ABILITY_EMBODYASPECTTEALMASK',
+    'ABILITY_EMBODYASPECTHEARTHFLAMEMASK',
+    'ABILITY_EMBODYASPECTWELLSPRINGMASK',
+    'ABILITY_EMBODYASPECTCORNERSTONEMASK',
+    'ABILITY_TOXICCHAIN',
+    'ABILITY_SUPERSWEETSYRUP',
+    'ABILITY_TERASHIFT',
+    'ABILITY_TERASHELL',
+    'ABILITY_TERAFORMZERO',
+    'ABILITY_POISONPUPPETEER',
+    'ABILITY_PIERCINGDRILL',
+    'ABILITY_DRAGONIZE',
+    'ABILITY_313',
+    'ABILITY_EELEVATE',
+    'ABILITY_314',
+    'ABILITY_MEGA_SOL',
+    'ABILITY_316',
+    'ABILITY_FIRE_MANE',
+    'ABILITY_317',
+    'ABILITY_SPICY_SPRAY',
+}
+
+# Species whose old DPE records used an effect-sharing byte instead of their
+# actual ability identity.  These values feed the canonical u16 table only.
+SPECIES_ABILITY_OVERRIDES = {
+    'SPECIES_GALLADE': ('ABILITY_STEADFAST', 'ABILITY_SHARPNESS', 'ABILITY_JUSTIFIED'),
+    'SPECIES_KLEAVOR': ('ABILITY_SWARM', 'ABILITY_SHEERFORCE', 'ABILITY_SHARPNESS'),
+    'SPECIES_KLAWF': ('ABILITY_ANGERSHELL', 'ABILITY_SHELLARMOR', 'ABILITY_REGENERATOR'),
+    'SPECIES_ESPATHRA': ('ABILITY_OPPORTUNIST', 'ABILITY_FRISK', 'ABILITY_SPEEDBOOST'),
+    'SPECIES_FLAMIGO': ('ABILITY_SCRAPPY', 'ABILITY_TANGLEDFEET', 'ABILITY_COSTAR'),
+    'SPECIES_VELUZA': ('ABILITY_MOLDBREAKER', 'ABILITY_NONE', 'ABILITY_SHARPNESS'),
+    'SPECIES_FARIGIRAF': ('ABILITY_CUDCHEW', 'ABILITY_ARMORTAIL', 'ABILITY_SAPSIPPER'),
+    'SPECIES_WALKING_WAKE': ('ABILITY_PROTOSYNTHESIS', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_TREADS': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_BUNDLE': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_HANDS': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_JUGULIS': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_MOTH': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_THORNS': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_VALIANT': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_LEAVES': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_WO_CHIEN': ('ABILITY_TABLETSOFRUIN', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_CHIEN_PAO': ('ABILITY_SWORDOFRUIN', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_TING_LU': ('ABILITY_VESSELOFRUIN', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_CHI_YU': ('ABILITY_BEADSOFRUIN', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_URSALUNA_BLOODMOON': ('ABILITY_MINDSEYE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_HYDRAPPLE': ('ABILITY_SUPERSWEETSYRUP', 'ABILITY_REGENERATOR', 'ABILITY_STICKYHOLD'),
+    'SPECIES_GOUGING_FIRE': ('ABILITY_PROTOSYNTHESIS', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_RAGING_BOLT': ('ABILITY_PROTOSYNTHESIS', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_BOULDER': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_IRON_CROWN': ('ABILITY_QUARKDRIVE', 'ABILITY_NONE', 'ABILITY_NONE'),
+    'SPECIES_TERAPAGOS_TERASTAL': ('ABILITY_TERASHELL', 'ABILITY_NONE', 'ABILITY_NONE'),
+}
+
+
+def GenerateAbilityTables():
+    source_path = os.path.join(SRC, 'Base_Stats.c')
+    generated_dir = os.path.join(SRC, 'generated')
+    os.makedirs(generated_dir, exist_ok=True)
+    with open(source_path, encoding='utf-8', errors='replace') as source_file:
+        source = source_file.read()
+
+    ability_fields = re.compile(r'(\.(?:ability1|ability2|hiddenAbility)\s*=\s*)(ABILITY_[A-Z0-9_]+)')
+    compat_source = ability_fields.sub(
+        lambda m: m.group(1) + 'ABILITY_NONE' if m.group(2) in CANONICAL_U16_ABILITIES else m.group(0),
+        source)
+    compat_source = compat_source.replace('#include "defines.h"', '#include "../defines.h"')
+    compat_source = compat_source.replace('#include "../include/', '#include "../../include/')
+    with open(os.path.join(generated_dir, 'Base_Stats_Compat.c'), 'w', encoding='utf-8', newline='\n') as output:
+        output.write(compat_source)
+
+    entries = []
+    current_species = None
+    current = {'ability1': 'ABILITY_NONE', 'ability2': 'ABILITY_NONE', 'hiddenAbility': 'ABILITY_NONE'}
+    for line in source.splitlines():
+        species_match = re.match(r'\s*\[(SPECIES_[A-Z0-9_]+)\]\s*=', line)
+        if species_match:
+            if current_species is not None:
+                entries.append((current_species, current.copy()))
+            current_species = species_match.group(1)
+            current = {'ability1': 'ABILITY_NONE', 'ability2': 'ABILITY_NONE', 'hiddenAbility': 'ABILITY_NONE'}
+        field_match = re.search(r'\.(ability1|ability2|hiddenAbility)\s*=\s*(ABILITY_[A-Z0-9_]+)', line)
+        if current_species is not None and field_match:
+            current[field_match.group(1)] = field_match.group(2)
+    if current_species is not None:
+        entries.append((current_species, current))
+
+    entries = [(species, dict(zip(('ability1', 'ability2', 'hiddenAbility'), SPECIES_ABILITY_OVERRIDES[species])))
+               if species in SPECIES_ABILITY_OVERRIDES else (species, abilities)
+               for species, abilities in entries]
+
+    with open(os.path.join(generated_dir, 'Species_Abilities.c'), 'w', encoding='utf-8', newline='\n') as output:
+        output.write('#include "../defines.h"\n#include "../../include/abilities.h"\n#include "../../include/base_stats.h"\n\n')
+        output.write('const struct SpeciesAbilities gSpeciesAbilities[] =\n{\n')
+        for species, abilities in entries:
+            output.write('    [%s] = {%s, %s, %s},\n' % (species, abilities['ability1'], abilities['ability2'], abilities['hiddenAbility']))
+        output.write('};\n')
 
 
 class Master:
@@ -263,20 +410,26 @@ def GetFlagsFromFlagFile(filePath: str) -> [str]:
 def ProcessSpriteSet(fileListing: [str], flags: [str], outputFile: str, title: str):
     assembledFile = os.path.join(ASSEMBLY, 'generated', outputFile)
     if (not os.path.isfile(assembledFile)
+            or os.path.getsize(assembledFile) <= len('@THIS IS A GENERATED FILE! DO NOT MODIFY IT!\n')
             or max(list(map(os.path.getmtime, fileListing))) > os.path.getmtime(assembledFile)):  # If a sprite has been modified
         print("Processing {}.".format(title))
-        combinedFile = open(assembledFile, 'w')
-        combinedFile.write('@THIS IS A GENERATED FILE! DO NOT MODIFY IT!\n')
-        for sprite in fileListing:
-            assembled = sprite.split('.png')[0] + '.s'
+        temporaryFile = assembledFile + '.tmp'
+        try:
+            with open(temporaryFile, 'w') as combinedFile:
+                combinedFile.write('@THIS IS A GENERATED FILE! DO NOT MODIFY IT!\n')
+                for sprite in fileListing:
+                    assembled = sprite.split('.png')[0] + '.s'
 
-            if (not os.path.isfile(assembled)
-                    or os.path.getmtime(sprite) > os.path.getmtime(assembled)):
-                RunCommand([GR, sprite] + flags + ['-o', assembled])
+                    if (not os.path.isfile(assembled)
+                            or os.path.getmtime(sprite) > os.path.getmtime(assembled)):
+                        RunCommand([GR, sprite] + flags + ['-o', assembled])
 
-            with open(assembled, 'r') as tempFile:
-                combinedFile.write(tempFile.read())
-        combinedFile.close()
+                    with open(assembled, 'r') as tempFile:
+                        combinedFile.write(tempFile.read())
+            os.replace(temporaryFile, assembledFile)
+        finally:
+            if os.path.isfile(temporaryFile):
+                os.remove(temporaryFile)
 
 
 def ProcessSpriteGraphics():
@@ -366,6 +519,9 @@ def RunGlob(globString: str, fn) -> map:
     if sys.version_info > (3, 4):
         try:
             files = glob(os.path.join(directory, globString), recursive=True)
+            if globString == '**/*.c':
+                files = [file for file in files
+                         if os.path.normpath(file) != os.path.normpath(os.path.join(SRC, 'Base_Stats.c'))]
             return map(fn, files)
 
         except TypeError:
@@ -405,6 +561,7 @@ def main():
             pass
 
         ProcessSpriteGraphics()
+        GenerateAbilityTables()
         TMDataBuilder()
         TutorDataBuilder()
 
