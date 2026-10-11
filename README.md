@@ -1,7 +1,7 @@
-# Dynamic Pokemon Expansion (added Gen 9)
-#### This branch is 99% complete , just poltchageist and Sinistcha are missing form sprites so for convience we've added their sprites as their form sprites. Soon that will be complete as well.
+# Dynamic Pokemon Expansion (added Gen 9 and ZA Megas)
+#### This branch is complete and adds pokemon upto gen 9 and megas from legends za. Only to be used with CFRU Expansion
 ## Main Contributors
-Zake , Axel Loquendo and The-Code-Mining-Hub (TCMH) people. (discord link - https://discord.com/invite/CDted4ytpn ) 
+Zake , Axel Loquendo and grilokapu. (discord link - https://discord.com/invite/CDted4ytpn ) 
 #### 'We love your support. - TCMH'
 
 ## What is this:
